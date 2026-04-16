@@ -89,18 +89,25 @@ export const useMovies = (options?: UseMoviesOptions) => {
     setError(null);
 
     try {
-      const response = await fetch(url, { signal: abortController.signal });
-
-      if (!response.ok) {
-        // Manejarlos individualmente asegura un buen debugging
-        if (response.status === 401) throw new Error("Error 401: Llave API de TMDB inválida o suspendida.");
-        if (response.status === 404) throw new Error("Error 404: Endpoint o Recurso de TMDB no encontrado.");
-        if (response.status === 429) throw new Error("Error 429: Too Many Requests. Límite de carga excedido en TMDB.");
-        
-        throw new Error(`Error en la comunicación con TMDB: ${response.statusText}`);
+      let data;
+      // LCP prefetch optimization: intercept the global promise if available
+      if (currentPage === 1 && !options?.genre && !options?.year && (window as any).__TMDB_PREFETCH__) {
+        data = await (window as any).__TMDB_PREFETCH__;
+        delete (window as any).__TMDB_PREFETCH__; // Use once
       }
+      
+      if (!data) {
+        const response = await fetch(url, { signal: abortController.signal });
 
-      const data = await response.json();
+        if (!response.ok) {
+          if (response.status === 401) throw new Error("Error 401: Llave API de TMDB inválida o suspendida.");
+          if (response.status === 404) throw new Error("Error 404: Endpoint o Recurso de TMDB no encontrado.");
+          if (response.status === 429) throw new Error("Error 429: Too Many Requests. Límite de carga excedido en TMDB.");
+          throw new Error(`Error en la comunicación con TMDB: ${response.statusText}`);
+        }
+
+        data = await response.json();
+      }
 
       // Validación Typescript vía Type Guard estricto
       if (!isTMDBResponse(data)) {

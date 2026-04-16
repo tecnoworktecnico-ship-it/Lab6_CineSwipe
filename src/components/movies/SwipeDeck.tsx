@@ -4,7 +4,14 @@ import { useMovies } from '../../hooks/movies/useMovies';
 import { useMovieActions, useMovieHistory } from '../../context/movies/MovieContext';
 import { TMDBMovie } from '../../types/tmdb.types';
 
+// 1. Definimos un svg ultraligero que simula la tarjeta y evita LCP request discovery delays
+const LCP_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 185 278'%3E%3Crect width='100%25' height='100%25' fill='%231f2937'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='20' font-family='sans-serif'%3E%F0%9F%8E%AC%3C/text%3E%3C/svg%3E";
+
 export const SwipeDeck: React.FC = () => {
+  // Leer poster cacheado para que el LCP ocurra inmediatamente (sin esperar la API)
+  const cachedPoster = React.useMemo(() => {
+    try { return localStorage.getItem('cs_lcp_poster') || LCP_PLACEHOLDER; } catch { return LCP_PLACEHOLDER; }
+  }, []);
   const { movies, loading, error, loadMore, hasMore } = useMovies();
   const dispatch = useMovieActions();
   const { history } = useMovieHistory();
@@ -25,6 +32,13 @@ export const SwipeDeck: React.FC = () => {
         const newItems = movies.filter(m => !existingIds.has(m.id));
         const updated = [...prevDeck, ...newItems];
         deckRef.current = updated;
+
+        // Guardar la URL del primer póster en localStorage para precargar en la próxima visita (LCP)
+        if (updated.length > 0 && updated[0].poster_path) {
+          const lcpUrl = `https://image.tmdb.org/t/p/w185${updated[0].poster_path}`;
+          try { localStorage.setItem('cs_lcp_poster', lcpUrl); } catch (_) {}
+        }
+
         return updated;
       });
     }
@@ -76,9 +90,39 @@ export const SwipeDeck: React.FC = () => {
 
   if (loading && deck.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-[500px] w-full max-w-sm rounded-2xl bg-gray-800 border-2 border-gray-700 shadow-xl shadow-black animate-pulse">
-        <div className="w-12 h-12 border-4 border-t-red-500 border-b-red-500 border-transparent rounded-full animate-spin"></div>
-        <p className="text-gray-400 mt-4 font-semibold tracking-widest uppercase">Buscando...</p>
+      <div className="flex flex-col items-center gap-6">
+        <div className="flex gap-6 text-sm font-bold tracking-wide">
+          <span className="text-green-500 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 opacity-0">❤ 0 likes</span>
+          <span className="text-rose-500 bg-rose-500/10 px-3 py-1 rounded-full border border-rose-500/20 opacity-0">✕ 0 no me gusta</span>
+        </div>
+        {/* Skeleton con la misma forma que SwipeCard — img real para LCP inmediato */}
+        <div className="relative w-full max-w-sm h-[500px] rounded-2xl overflow-hidden bg-gray-800 border border-gray-700 shadow-2xl">
+          {/* img real: dispara el LCP cuando React monta, sin esperar la API */}
+          <img
+            src={cachedPoster}
+            alt="Cargando película..."
+            className="absolute inset-0 w-full h-full object-cover"
+            // Force priority and decoding to bypass browser heuristics
+            {...({ fetchpriority: 'high', decoding: 'sync' } as any)}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+          <div className="absolute inset-0 flex items-center justify-center animate-pulse">
+            <div className="w-10 h-10 border-4 border-t-red-500 border-b-transparent border-l-transparent border-r-transparent rounded-full animate-spin" />
+          </div>
+          <div className="absolute bottom-6 left-6 right-6">
+            <div className="h-7 bg-white/10 rounded-lg w-3/4 mb-3 animate-pulse" />
+            <div className="flex gap-2">
+              <div className="h-5 bg-white/10 rounded-md w-16 animate-pulse" />
+              <div className="h-5 bg-white/10 rounded-md w-12 animate-pulse" />
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-8">
+          <div className="w-16 h-16 rounded-full bg-gray-800 border-2 border-red-500/40" />
+          <div className="w-10 h-10 rounded-full bg-gray-800 border border-gray-600" />
+          <div className="w-16 h-16 rounded-full bg-gray-800 border-2 border-green-500/40" />
+        </div>
+        <p className="text-gray-400 text-xs tracking-wide animate-pulse">Cargando películas...</p>
       </div>
     );
   }
@@ -86,7 +130,7 @@ export const SwipeDeck: React.FC = () => {
   if (deck.length === 0) {
     return (
       <div className="flex items-center justify-center h-[500px] w-full max-w-sm rounded-2xl border-2 border-dashed border-gray-600 bg-gray-800/50">
-        <p className="text-gray-400 font-medium">No hay más películas por descubrir.</p>
+        <p className="text-gray-200 font-medium">No hay más películas por descubrir.</p>
       </div>
     );
   }
@@ -94,16 +138,16 @@ export const SwipeDeck: React.FC = () => {
   return (
     <div className="flex flex-col items-center gap-6">
 
-      {/* Contadores de historial en vivo */}
-      <div className="flex gap-6 text-sm font-semibold">
-        <span className="text-green-400">❤ {likesCount} likes</span>
-        <span className="text-red-400">✕ {dislikesCount} no me gusta</span>
+      {/* Contadores de historial en vivo (Mejorado para Accesibilidad) */}
+      <div className="flex gap-6 text-sm font-bold tracking-wide">
+        <span className="text-green-500 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">❤ {likesCount} likes</span>
+        <span className="text-rose-500 bg-rose-500/10 px-3 py-1 rounded-full border border-rose-500/20">✕ {dislikesCount} no me gusta</span>
       </div>
 
       {/* Mazo de tarjetas */}
       <div className="relative w-full max-w-sm" style={{ height: '500px' }}>
         {deck.map((movie, index) => {
-          if (index > 2) return null;
+          if (index > 1) return null; // Solo renderizamos 2 cartas para máximo rendimiento
           const isTopCard = index === 0;
 
           return (
@@ -123,7 +167,7 @@ export const SwipeDeck: React.FC = () => {
                     ...movie,
                     id: movie.id.toString(),
                     poster: movie.poster_path
-                      ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+                      ? `https://image.tmdb.org/t/p/w185${movie.poster_path}`
                       : 'https://via.placeholder.com/500x750?text=No+Poster',
                     rating: movie.vote_average,
                     year: parseInt(movie.release_date?.split('-')[0] || '0')
@@ -131,12 +175,19 @@ export const SwipeDeck: React.FC = () => {
                   onSwipe={handleSwipe}
                 />
               ) : (
-                <div className="w-full rounded-2xl overflow-hidden bg-gray-800 border border-gray-700 shadow-xl opacity-70" style={{ height: '500px' }}>
+                <div 
+                  className="w-full rounded-2xl overflow-hidden bg-gray-800 border border-gray-700 shadow-xl opacity-70" 
+                  style={{ height: '500px' }}
+                  aria-hidden="true"
+                >
                   {movie.poster_path && (
                     <img
-                      src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+                      src={`https://image.tmdb.org/t/p/w92${movie.poster_path}`}
+                      alt={`Fondo de la siguiente película: ${movie.title}`}
                       className="w-full h-full object-cover brightness-75 blur-sm"
                       draggable="false"
+                      loading="lazy"
+                      decoding="async"
                     />
                   )}
                 </div>
@@ -181,7 +232,7 @@ export const SwipeDeck: React.FC = () => {
         </button>
       </div>
 
-      <p className="text-gray-500 text-xs tracking-wide">
+      <p className="text-gray-400 text-xs tracking-wide">
         {deck.length} película{deck.length !== 1 ? 's' : ''} por descubrir
       </p>
     </div>

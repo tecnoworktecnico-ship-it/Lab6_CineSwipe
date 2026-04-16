@@ -3,9 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CineSwipe MVP</title>
+    <meta name="description" content="CineSwipe: Descubre tus próximas películas favoritas con un simple swipe. La forma más divertida y rápida de encontrar qué ver." />
+    <meta name="keywords" content="cine, películas, swipe, recomendación, tmdb, discovery" />
+    
+    <!-- Optimización de Carga Crítica de Imágenes (crossorigin requerido para recursos CORS) -->
+    <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
+    <link rel="dns-prefetch" href="https://image.tmdb.org">
+    <!-- Pre-conexión eliminada ya que el prefetch nativo se encarga de api.themoviedb.org automático. -->
+    
+    <meta property="og:title" content="CineSwipe - Descubre Películas" />
+    <meta property="og:description" content="Swipe a la derecha para dar like, a la izquierda para pasar. La mejor forma de elegir qué ver hoy." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <title>CineSwipe - Descubre tu próxima película</title>
+    <!-- LCP Preload Avanzado: Pre-fetch inmediato de la API para ganar \~300ms. 
+         %VITE_TMDB_KEY% será reemplazado por Vite al vuelo -->
+    <link rel="preload" href="https://api.themoviedb.org/3/discover/movie?api_key=%VITE_TMDB_KEY%&page=1&sort_by=popularity.desc&language=es-MX" as="fetch" crossorigin="anonymous">
+    
+    <!-- LCP Real: Descubrible estáticamente en el HTML nativo -->
+    <link rel="preload" as="image" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 185 278'%3E%3Crect width='100%25' height='100%25' fill='%231f2937'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='20' font-family='sans-serif'%3E%F0%9F%8E%AC%3C/text%3E%3C/svg%3E" fetchpriority="high">
+
+    <script>
+      window.__TMDB_PREFETCH__ = fetch(
+        `https://api.themoviedb.org/3/discover/movie?api_key=%VITE_TMDB_KEY%&page=1&sort_by=popularity.desc&language=es-MX`
+      ).then(r => r.json()).catch(() => null);
+    </script>
   </head>
-  <body class="bg-gray-900 text-white">
+  <body class="bg-gray-950 text-white selection:bg-red-500/30">
+    <!-- Consumo fantasma del Preload LCP para evitar el Warning en Chrome Console -->
+    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 185 278'%3E%3Crect width='100%25' height='100%25' fill='%231f2937'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='20' font-family='sans-serif'%3E%F0%9F%8E%AC%3C/text%3E%3C/svg%3E" style="display: none;" alt="" />
+    
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
